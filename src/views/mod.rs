@@ -1,61 +1,89 @@
 use ::phi::{Phi, View, ViewAction};
+use ::phi::data::Rectangle;
 use ::sdl2::pixels::Color;
 
-pub struct DefaultView;
-pub struct ViewA;
-pub struct ViewB;
+// Constants
 
-impl View for DefaultView {
-    fn render(&mut self, context: &mut Phi, _: f64) -> ViewAction {
-        let renderer = &mut context.renderer;
-        let events = &context.events;
+// pixels traveled by the player every second when moving
+const PLAYER_SPEED: f64 = 180.0;
 
-        if events.now.quit || events.now.key_escape == Some(true) {
-            return ViewAction::Quit;
+// Data types
+
+
+struct Ship {
+    rect: Rectangle,
+}
+
+// View definitions
+
+pub struct ShipView{
+    player: Ship,
+}
+
+impl ShipView {
+    pub fn new(phi: &mut Phi) -> ShipView {
+        ShipView {
+            player: Ship {
+                rect: Rectangle {
+                    x: 64.0,
+                    y: 64.0,
+                    w: 32.0,
+                    h: 32.0,
+                }
+            }
         }
-
-        renderer.set_draw_color(Color::RGB(0,0,0));
-        renderer.clear();
-
-        ViewAction::None
     }
 }
 
-impl View for ViewA {
-    fn render(&mut self, context: &mut Phi, _: f64) -> ViewAction {
-        let renderer = &mut context.renderer;
-        let events = &context.events;
-
-        if events.now.quit || events.now.key_escape == Some(true) {
+impl View for ShipView {
+    fn render(&mut self, phi: &mut Phi, elapsed: f64) -> ViewAction {
+        if phi.events.now.quit || phi.events.now.key_escape == Some(true) {
             return ViewAction::Quit;
         }
 
-        if events.now.key_space == Some(true) {
-            return ViewAction::ChangeView(Box::new(ViewB))
-        }
+        // Move the Ship
 
-        renderer.set_draw_color(Color::RGB(255,0,0));
-        renderer.clear();
+        let diagonal =
+            (phi.events.key_up ^ phi.events.key_down) &&
+            (phi.events.key_left ^ phi.events.key_right);
 
-        ViewAction::None
-    }
-}
+        let moved =
+            if diagonal { 1.0 / 2.0f64.sqrt() }
+            else { 1.0 } * PLAYER_SPEED * elapsed;
 
-impl View for ViewB {
-    fn render(&mut self, context: &mut Phi, _: f64) -> ViewAction {
-        let renderer = &mut context.renderer;
-        let events = &context.events;
+        let dx = match(phi.events.key_left, phi.events.key_right) {
+            (true, true) | (false, false) => 0.0,
+            (true, false) => -moved,
+            (false, true) => moved,
+        };
 
-        if events.now.quit || events.now.key_escape == Some(true) {
-            return ViewAction::Quit;
-        }
+        let dy = match(phi.events.key_up, phi.events.key_down) {
+            (true, true) | (false, false) => 0.0,
+            (true, false) => - moved,
+            (false, true) => moved,
+        };
 
-        if events.now.key_space == Some(true) {
-            return ViewAction::ChangeView(Box::new(ViewA))
-        }
+        self.player.rect.x += dx;
+        self.player.rect.y += dy;
 
-        renderer.set_draw_color(Color::RGB(0,0,255));
-        renderer.clear();
+        // Boundaries of the playable area
+        let movable_region = Rectangle {
+            x: 0.0,
+            y: 0.0,
+            w: phi.output_size().0 * 0.70, // don't let it go to the far right wall
+            h: phi.output_size().1,
+        };
+
+        // If player is larger than the screen, abort
+        self.player.rect = self.player.rect.move_inside(movable_region).unwrap();
+
+        // Clear the screen
+        phi.renderer.set_draw_color(Color::RGB(0,0,0));
+        phi.renderer.clear();
+
+        // Render scene
+        phi.renderer.set_draw_color(Color::RGB(200,200,50));
+        phi.renderer.fill_rect(self.player.rect.to_sdl().unwrap());
 
         ViewAction::None
     }

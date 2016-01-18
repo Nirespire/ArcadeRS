@@ -2,6 +2,7 @@
 // Cannot be done in namespace since this is a preprocessor action
 #[macro_use]
 mod events;
+pub mod data;
 
 use ::sdl2::render::Renderer;
 use ::sdl2::pixels::Color;
@@ -10,9 +11,11 @@ use ::sdl2::pixels::Color;
 struct_events!{
     keyboard: {
         key_escape: Escape,
-        key_up: Up,
+        key_space: Space,
         key_down: Down,
-        key_space: Space
+        key_up: Up,
+        key_right: Right,
+        key_left: Left
     },
     else: {
         quit: Quit { .. }
@@ -26,6 +29,13 @@ struct_events!{
 pub struct Phi<'window> {
     pub events: Events,
     pub renderer: Renderer<'window>,
+}
+
+impl<'window> Phi<'window> {
+    pub fn output_size(&self) -> (f64, f64) {
+        let (w,h) = self.renderer.output_size().unwrap();
+        (w as f64, h as f64)
+    }
 }
 
 // ViewAction is a way for for currently executed/rendered view
@@ -56,7 +66,7 @@ where F: Fn(&mut Phi) -> Box<View> {
 
     // Create the window
     let window = video.window(title, 800, 600)
-        .position_centered().opengl()
+        .position_centered().opengl().resizable()
         .build().unwrap();
 
     // Create the context
@@ -100,7 +110,7 @@ where F: Fn(&mut Phi) -> Box<View> {
         }
 
         // Logic and rendering
-        context.events.pump();
+        context.events.pump(&mut context.renderer);
 
         match current_view.render(&mut context, elapsed) {
             ViewAction::None => context.renderer.present(),
