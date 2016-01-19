@@ -334,7 +334,7 @@ impl Asteroid {
 
 // View definitions
 
-pub struct ShipView{
+pub struct GameView{
     player: Ship,
     // Store bullets behind pointers
     bullets: Vec<Box<Bullet>>,
@@ -342,15 +342,15 @@ pub struct ShipView{
     bg: BgSet,
 }
 
-impl ShipView {
+impl GameView {
 
     #[allow(dead_code)]
-    pub fn new(phi: &mut Phi) -> ShipView {
+    pub fn new(phi: &mut Phi) -> GameView {
         let bg = BgSet::new(&mut phi.renderer);
-        ShipView::with_backgrounds(phi, bg)
+        GameView::with_backgrounds(phi, bg)
     }
 
-    pub fn with_backgrounds(phi: &mut Phi, bg: BgSet) -> ShipView {
+    pub fn with_backgrounds(phi: &mut Phi, bg: BgSet) -> GameView {
         // Load texture from filesystem
         let spritesheet = Sprite::load(&mut phi.renderer, SPACESHIP_PATH).unwrap();
 
@@ -368,7 +368,7 @@ impl ShipView {
             }
         }
 
-        ShipView {
+        GameView {
             player: Ship {
                 rect: Rectangle {
                     x: 64.0,
@@ -387,7 +387,7 @@ impl ShipView {
     }
 }
 
-impl View for ShipView {
+impl View for GameView {
     fn render(&mut self, phi: &mut Phi, elapsed: f64) -> ViewAction {
         if phi.events.now.quit {
             return ViewAction::Quit;
