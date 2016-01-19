@@ -6,6 +6,11 @@ use ::sdl2::render::{Renderer, Texture};
 use ::sdl2_image::LoadTexture;
 
 
+// Common interface for rendering component to region
+pub trait Renderable {
+    fn render(&self, renderer: &mut Renderer, dest: Rectangle);
+}
+
 // Automatically implement a clone trait
 #[derive(Clone)]
 pub struct Sprite {
@@ -59,18 +64,89 @@ impl Sprite {
         (self.src.w, self.src.h)
     }
 
-    pub fn render(&self, renderer: &mut Renderer, dest: Rectangle) {
+}
+
+impl Renderable for Sprite {
+    fn render(&self, renderer: &mut Renderer, dest: Rectangle) {
         renderer.copy(&mut self.tex.borrow_mut(), self.src.to_sdl(), dest.to_sdl())
     }
 }
 
-// Trait to render a sprite within an area
-pub trait CopySprite {
-    fn copy_sprite(&mut self, sprite: &Sprite, dest: Rectangle);
+#[derive(Clone)]
+pub struct AnimatedSprite {
+    // The frames that will be rendered, in order
+    sprites: Rc<Vec<Sprite>>,
+
+    // Second between each frame
+    frame_delay: f64,
+
+    // Total time a sprite has been alive
+    current_time: f64,
 }
 
-impl <'window> CopySprite for Renderer<'window> {
-    fn copy_sprite(&mut self, sprite: &Sprite, dest: Rectangle){
-        sprite.render(self, dest);
+impl AnimatedSprite {
+    pub fn new(sprites: Vec<Sprite>, frame_delay: f64) -> AnimatedSprite {
+        AnimatedSprite {
+            sprites: Rc::new(sprites),
+            frame_delay: frame_delay,
+            current_time: 0.0,
+        }
+    }
+
+    // Create new animated sprite which goes to next frame fps times per second
+    pub fn with_fps(sprites: Vec<Sprite>, fps: f64) -> AnimatedSprite {
+        if fps == 0.0 {
+            panic!("Passed 0 to AnimatedSprite::with_fps");
+        }
+
+        AnimatedSprite::new(sprites, 1.0 / fps)
+    }
+
+    // Number of frames of the animation
+    pub fn frames(&self) -> usize {
+        self.sprites.len()
+    }
+
+    // If negative, rewind animation
+    pub fn set_frame_delay(&mut self, frame_delay: f64) {
+        self.frame_delay = frame_delay;
+    }
+
+    // Set number of frames an animation goes through per second
+    pub fn set_fps(&mut self, fps: f64) {
+        if fps == 0.0 {
+            panic!("Passed 0 to AnimatedSprite::set_fps");
+        }
+        self.set_frame_delay(1.0 / fps);
+    }
+
+    pub fn add_time(&mut self, dt: f64) {
+        self.current_time += dt;
+
+        // If going back in time, lets us select last frame when current_frame goes negative
+        if self.current_time < 0.0 {
+            self.current_time = (self.frames() -1) as f64 * self.frame_delay;
+        }
+    }
+}
+
+impl Renderable for AnimatedSprite {
+    // Renders the current frame of the sprite
+    fn render(&self, renderer: &mut Renderer, dest: Rectangle) {
+        let current_frame = (self.current_time / self.frame_delay) as usize % self.frames();
+
+        let sprite = &self.sprites[current_frame];
+        sprite.render(renderer, dest);
+    }
+}
+
+// Trait to render a sprite within an area
+pub trait CopySprite<T> {
+    fn copy_sprite(&mut self, sprite: &T, dest: Rectangle);
+}
+
+impl <'window, T: Renderable> CopySprite<T> for Renderer<'window> {
+    fn copy_sprite(&mut self, renderable: &T, dest: Rectangle){
+        renderable.render(self, dest);
     }
 }
